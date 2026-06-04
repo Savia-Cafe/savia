@@ -67,6 +67,14 @@ nav button:hover:not(.active){opacity:0.8;}
 .user-chip .dot{width:7px;height:7px;background:var(--savia);border-radius:50%;}
 .logout-btn{background:none;border:1px solid var(--linea-fuerte);color:var(--bosque);opacity:0.55;padding:7px 12px;border-radius:100px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.12em;text-transform:uppercase;transition:all 0.2s;}
 .logout-btn:hover{border-color:var(--danger);color:var(--danger);opacity:1;}
+.menu-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:46px;height:46px;background:white;border:1px solid var(--linea-fuerte);border-radius:13px;cursor:pointer;padding:0;flex-shrink:0;}
+.menu-toggle span{display:block;width:20px;height:2px;background:var(--bosque);border-radius:2px;margin:0 auto;transition:all 0.3s;}
+.menu-toggle.open span:nth-child(1){transform:translateY(7px) rotate(45deg);}
+.menu-toggle.open span:nth-child(2){opacity:0;}
+.menu-toggle.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
+.nav-backdrop{display:none;position:fixed;inset:0;background:rgba(30,35,24,0.4);z-index:90;}
+.nav-backdrop.show{display:block;}
+.nav-mobile-foot{display:none;}
 
 main{max-width:1240px;margin:0 auto;padding:36px 32px 80px;}
 .view{display:none;}
@@ -235,11 +243,36 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
 #toast.err{background:var(--danger);}
 
 @media(max-width:860px){
-  header{padding:0 18px;}
+  header{padding:0 18px;min-height:62px;}
   main{padding:24px 18px 60px;}
   .dash-grid{grid-template-columns:1fr 1fr;}
   .form-grid{grid-template-columns:1fr;}
-  nav{order:3;width:100%;justify-content:flex-start;overflow-x:auto;padding-bottom:6px;}
+  .card{max-width:100%;}
+  .page-head{text-align:center;}
+  .section-title{justify-content:center;}
+  .menu-toggle{display:flex;}
+  .header-right{display:none;}
+  nav{
+    position:fixed;top:62px;left:0;right:0;
+    flex-direction:column;gap:7px;flex-wrap:nowrap;
+    background:var(--humo);
+    padding:16px 16px calc(20px + env(safe-area-inset-bottom));
+    border-bottom:1px solid var(--linea);
+    box-shadow:0 22px 44px rgba(30,35,24,0.18);
+    transform:translateY(-135%);
+    transition:transform 0.32s cubic-bezier(0.16,1,0.3,1);
+    z-index:95;max-height:calc(100vh - 62px);overflow-y:auto;
+  }
+  nav.open{transform:translateY(0);}
+  nav button{
+    width:100%;text-align:left;
+    padding:16px 18px;font-size:13px;letter-spacing:0.1em;
+    border-radius:12px;opacity:0.75;
+    border:1px solid var(--linea);background:white;
+  }
+  nav button.active{opacity:1;border-color:var(--bosque);}
+  .nav-mobile-foot{display:flex;margin-top:6px;padding-top:14px;border-top:1px solid var(--linea);}
+  .nav-mobile-foot .logout-btn{display:block;width:100%;padding:16px;font-size:11px;text-align:center;background:white;}
 }
 @media(max-width:520px){
   .dash-grid{grid-template-columns:1fr;}
@@ -287,6 +320,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
       <div class="mark">SAVIA</div>
       <div class="sub">café · finanzas</div>
     </div>
+    <button class="menu-toggle" id="menuToggle" onclick="toggleMenu()" aria-label="Menú"><span></span><span></span><span></span></button>
     <nav id="nav">
       <button data-view="dashboard" class="active">Resumen</button>
       <button data-view="venta">Venta</button>
@@ -296,12 +330,14 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
       <button data-view="suplidores">Suplidores</button>
       <button data-view="fijos">Fijos</button>
       <button data-view="config">Config</button>
+      <div class="nav-mobile-foot"><button class="logout-btn" onclick="doLogout()">Cerrar sesión</button></div>
     </nav>
     <div class="header-right">
       <div class="user-chip"><span class="dot"></span><span id="userLabel">—</span></div>
       <button class="logout-btn" onclick="doLogout()">Salir</button>
     </div>
   </header>
+  <div class="nav-backdrop" id="navBackdrop" onclick="toggleMenu()"></div>
 
   <main>
     <!-- ───── DASHBOARD ───── -->
@@ -591,8 +627,17 @@ $('nav').addEventListener('click', e => {
   btn.classList.add('active');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   $('view-'+btn.dataset.view).classList.add('active');
+  closeMenu();
   window.scrollTo({top:0,behavior:'smooth'});
 });
+
+/* menú móvil */
+function closeMenu(){ $('nav').classList.remove('open'); $('menuToggle').classList.remove('open'); $('navBackdrop').classList.remove('show'); }
+window.toggleMenu = () => {
+  const open = $('nav').classList.toggle('open');
+  $('menuToggle').classList.toggle('open', open);
+  $('navBackdrop').classList.toggle('show', open);
+};
 
 /* ═══════════ DASHBOARD ═══════════ */
 function renderDashboard(){
@@ -1026,7 +1071,7 @@ $('modal').addEventListener('click', e => { if(e.target.id==='modal') closeModal
 function goView(v){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
-  $('view-'+v).classList.add('active'); window.scrollTo({top:0,behavior:'smooth'});
+  $('view-'+v).classList.add('active'); closeMenu(); window.scrollTo({top:0,behavior:'smooth'});
 }
 window.goView = goView;
 
