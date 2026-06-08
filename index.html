@@ -309,7 +309,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
 <body>
 
 <!-- ═══════════ LOGIN ═══════════ -->
-<div class="auth-screen" id="authScreen">
+<div class="auth-screen hidden" id="authScreen">
   <div class="auth-card">
     <div class="auth-logo">
       <div class="mark">SAVIA</div>
@@ -335,7 +335,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
 </div>
 
 <!-- ═══════════ LOADING ═══════════ -->
-<div class="loading-overlay hidden" id="loading">
+<div class="loading-overlay" id="loading">
   <div class="spinner"></div>
   <div class="loading-text" id="loadingText">Cargando</div>
 </div>
@@ -673,6 +673,7 @@ onAuthStateChanged(auth, async user => {
     await loadAll();
     restoreView();
   }else{
+    hideLoading();
     $('authScreen').classList.remove('hidden');
     $('app').style.display='none';
   }
