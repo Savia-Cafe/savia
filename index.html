@@ -459,6 +459,12 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
         <select id="hCategoria" onchange="renderHistorial()"><option value="">Toda categoría</option></select>
         <button class="chip-btn export" onclick="exportExcel()">⬇ Excel</button>
       </div>
+      <div class="dash-grid" id="histSummary" style="margin-bottom:22px;">
+        <div class="stat-card"><div class="corner"></div><div class="label">Ventas del periodo</div><div class="value green" id="hsVentas">$0</div><div class="sub" id="hsVentasSub">—</div></div>
+        <div class="stat-card"><div class="corner"></div><div class="label">Gastos del periodo</div><div class="value" id="hsGastos">$0</div><div class="sub" id="hsGastosSub">—</div></div>
+        <div class="stat-card"><div class="corner"></div><div class="label">Ganancia neta</div><div class="value" id="hsGanancia">$0</div><div class="sub">ventas − gastos</div></div>
+        <div class="stat-card"><div class="corner"></div><div class="label">Margen</div><div class="value" id="hsMargen">—</div><div class="sub">del periodo filtrado</div></div>
+      </div>
       <div class="table-wrap">
         <table class="data">
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Categoría</th><th>Método</th><th>Recibo</th><th style="text-align:right">Monto</th><th></th></tr></thead>
@@ -790,6 +796,14 @@ window.renderHistorial = () => {
   if(ft) rows=rows.filter(r=>r._t===ft);
   if(fc) rows=rows.filter(r=>r.cat===fc);
   if(q) rows=rows.filter(r=>(r.desc+' '+r.cat+' '+r.met).toLowerCase().includes(q));
+  // resumen del periodo filtrado
+  const sumV = rows.filter(r=>r._t==='venta').reduce((s,r)=>s+r.monto,0);
+  const sumG = rows.filter(r=>r._t==='gasto').reduce((s,r)=>s+Math.abs(r.monto),0);
+  const neta = sumV-sumG, nV=rows.filter(r=>r._t==='venta').length, nG=rows.filter(r=>r._t==='gasto').length;
+  $('hsVentas').textContent=fmtShort(sumV); $('hsVentasSub').textContent=nV+' día'+(nV===1?'':'s');
+  $('hsGastos').textContent=fmtShort(sumG); $('hsGastosSub').textContent=nG+' gasto'+(nG===1?'':'s');
+  const gn=$('hsGanancia'); gn.textContent=fmtShort(neta); gn.className='value '+(neta>=0?'green':'red');
+  $('hsMargen').textContent = sumV>0 ? Math.round(neta/sumV*100)+'%' : '—';
   $('histBody').innerHTML = rows.length ? rows.map(r=>`
     <tr>
       <td>${esc(r.fecha)}</td>
