@@ -115,6 +115,28 @@ main{max-width:1240px;margin:0 auto;padding:36px 32px 80px;}
 .pc-info .t{font-weight:400;font-size:14px;}
 .pc-info .m{font-size:11px;opacity:0.45;margin-top:2px;}
 .empty-note{text-align:center;padding:40px 20px;color:var(--bosque);opacity:0.35;font-style:italic;font-family:'Fraunces',serif;font-weight:300;}
+/* ── Reportes ── */
+.rep-tabs{display:inline-flex;gap:4px;background:white;border:1px solid var(--linea);border-radius:100px;padding:4px;margin-bottom:28px;}
+.rep-tab{background:none;border:none;padding:10px 22px;border-radius:100px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--bosque);opacity:0.5;transition:all 0.2s;}
+.rep-tab.active{background:var(--bosque);color:var(--crema);opacity:1;}
+.rep-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.card-soft{background:white;border-radius:var(--radius);box-shadow:var(--sombra);padding:24px 26px;}
+.rep-soft-title{font-family:'DM Sans',sans-serif;font-weight:500;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--savia);margin-bottom:16px;}
+.cmp{font-size:11px;margin-top:8px;display:inline-flex;align-items:center;gap:4px;}
+.cmp.up{color:var(--savia-d);}
+.cmp.down{color:var(--danger);}
+.cmp.flat{color:var(--bosque);opacity:0.4;}
+.rep-line{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--linea);}
+.rep-line:last-child{border-bottom:none;}
+.rep-line .k{font-size:13px;opacity:0.6;}
+.rep-line .v{font-family:'Fraunces',serif;font-weight:700;text-align:right;}
+.catbar-row{margin-bottom:14px;}
+.catbar-row:last-child{margin-bottom:0;}
+.catbar-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:13px;}
+.catbar-head .money{font-family:'Fraunces',serif;font-weight:700;font-size:13px;}
+.catbar-track{height:9px;background:var(--humo);border-radius:100px;overflow:hidden;}
+.catbar-fill{height:100%;background:var(--savia);border-radius:100px;transition:width 0.5s cubic-bezier(0.16,1,0.3,1);}
+@media(max-width:860px){ .rep-cols{grid-template-columns:1fr;} }
 
 /* ══════════ FORMS / CARDS ══════════ */
 .card{background:white;border-radius:var(--radius);box-shadow:var(--sombra);overflow:hidden;max-width:720px;}
@@ -331,6 +353,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
       <button data-view="venta">Venta</button>
       <button data-view="gasto">Gasto</button>
       <button data-view="historial">Historial</button>
+      <button data-view="reportes">Reportes</button>
       <button data-view="productos">Productos</button>
       <button data-view="suplidores">Suplidores</button>
       <button data-view="fijos">Fijos</button>
@@ -477,6 +500,49 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
           <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Categoría</th><th>Método</th><th>Recibo</th><th style="text-align:right">Monto</th><th></th></tr></thead>
           <tbody id="histBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ───── REPORTES ───── -->
+    <section class="view" id="view-reportes">
+      <div class="page-head">
+        <h1>Reportes</h1>
+        <span class="accent">tus números a fondo</span>
+      </div>
+      <div class="rep-tabs">
+        <button class="rep-tab active" data-rep="mensual" onclick="setRepTab('mensual')">Mensual</button>
+        <button class="rep-tab" data-rep="anual" onclick="setRepTab('anual')">Lo que va del año</button>
+      </div>
+
+      <!-- MENSUAL -->
+      <div id="rep-mensual">
+        <div class="toolbar">
+          <select id="repMes" onchange="renderRepMensual()"></select>
+          <button class="chip-btn export" onclick="exportRepMensual()">⬇ Exportar mes a Excel</button>
+        </div>
+        <div class="dash-grid" id="repMensualCards"></div>
+        <div class="rep-cols">
+          <div class="card-soft" id="repMetodos"></div>
+          <div class="card-soft" id="repDiasInfo"></div>
+        </div>
+        <div class="card-soft" id="repCatGastos" style="margin-bottom:36px;"></div>
+      </div>
+
+      <!-- ANUAL -->
+      <div id="rep-anual" style="display:none">
+        <div class="dash-grid" id="repAnualCards"></div>
+        <div class="section-title" id="repAnualChartTitle">Ventas vs gastos</div>
+        <div class="chart-card">
+          <div class="chart-legend">
+            <span><span class="sw" style="background:var(--savia)"></span>Ventas</span>
+            <span><span class="sw" style="background:var(--arena)"></span>Gastos</span>
+          </div>
+          <div class="chart-bars" id="repAnualChart"></div>
+        </div>
+        <div class="rep-cols">
+          <div class="card-soft" id="repAnualMejorPeor"></div>
+          <div class="card-soft" id="repAnualCat"></div>
+        </div>
       </div>
     </section>
 
@@ -630,7 +696,7 @@ async function loadAll(){
 }
 function renderAll(){
   fillCategoriaSelects(); fillSuplidoresDatalist(); fillMesFilter();
-  renderDashboard(); renderHistorial(); renderProductos(); renderSuplidores(); renderFijos(); renderCategorias();
+  renderDashboard(); renderHistorial(); renderProductos(); renderSuplidores(); renderFijos(); renderCategorias(); renderReportes();
 }
 
 /* ═══════════ NAVEGACIÓN ═══════════ */
@@ -1148,6 +1214,114 @@ function fillMesFilter(){
   const keys=[...set].filter(Boolean).sort().reverse();
   $('hMes').innerHTML = '<option value="">Todos los meses</option>'+keys.map(k=>`<option value="${k}">${monthName(k)}</option>`).join('');
 }
+
+/* ═══════════ REPORTES ═══════════ */
+let repTab='mensual';
+function sumK(arr,k){ return arr.reduce((s,x)=>s+(Number(x[k])||0),0); }
+function sumMonto(arr){ return arr.reduce((s,x)=>s+(Number(x.monto)||0),0); }
+function prevMonth(mk){ const [y,m]=mk.split('-').map(Number); const d=new Date(y,m-2,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function catBar(label,val,total){ const pct= total>0?(val/total*100):0; return `<div class="catbar-row"><div class="catbar-head"><span>${esc(label)}</span><span class="money">${fmt(val)}</span></div><div class="catbar-track"><div class="catbar-fill" style="width:${pct}%"></div></div></div>`; }
+function cmpHtml(cur,prev,upGood){
+  if(!prev && !cur) return '<div class="cmp flat">— sin datos previos</div>';
+  if(!prev) return '<div class="cmp up">nuevo vs mes anterior</div>';
+  const pct=Math.round((cur-prev)/Math.abs(prev)*100);
+  if(pct===0) return '<div class="cmp flat">= igual al mes anterior</div>';
+  const up=pct>0, good= upGood?up:!up;
+  return `<div class="cmp ${good?'up':'down'}">${up?'▲':'▼'} ${Math.abs(pct)}% vs mes anterior</div>`;
+}
+window.setRepTab = (t) => {
+  repTab=t;
+  document.querySelectorAll('.rep-tab').forEach(b=>b.classList.toggle('active',b.dataset.rep===t));
+  $('rep-mensual').style.display = t==='mensual'?'block':'none';
+  $('rep-anual').style.display = t==='anual'?'block':'none';
+};
+function fillRepMes(){
+  const set=new Set(); ventas.forEach(v=>set.add(monthKey(v.fecha))); gastos.forEach(g=>set.add(monthKey(g.fecha)));
+  set.add(monthKey(todayStr()));
+  const keys=[...set].filter(Boolean).sort().reverse();
+  const sel=$('repMes'); const prev=sel.value;
+  sel.innerHTML = keys.map(k=>`<option value="${k}">${monthName(k)}</option>`).join('');
+  sel.value = keys.includes(prev) ? prev : (keys[0]||'');
+}
+window.renderRepMensual = () => {
+  const mk=$('repMes').value; if(!mk) return;
+  const pmk=prevMonth(mk);
+  const vMes=ventas.filter(v=>monthKey(v.fecha)===mk), gMes=gastos.filter(g=>monthKey(g.fecha)===mk);
+  const vPrev=ventas.filter(v=>monthKey(v.fecha)===pmk), gPrev=gastos.filter(g=>monthKey(g.fecha)===pmk);
+  const totV=sumK(vMes,'total'), totG=sumK(gMes,'monto'), neta=totV-totG;
+  const totVp=sumK(vPrev,'total'), totGp=sumK(gPrev,'monto'), netaP=totVp-totGp;
+  $('repMensualCards').innerHTML=`
+    <div class="stat-card"><div class="corner"></div><div class="label">Ventas</div><div class="value green">${fmtShort(totV)}</div>${cmpHtml(totV,totVp,true)}</div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Gastos</div><div class="value">${fmtShort(totG)}</div>${cmpHtml(totG,totGp,false)}</div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Ganancia neta</div><div class="value ${neta>=0?'green':'red'}">${fmtShort(neta)}</div>${cmpHtml(neta,netaP,true)}</div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Margen</div><div class="value">${totV>0?Math.round(neta/totV*100)+'%':'—'}</div><div class="sub">de cada venta</div></div>`;
+  const ef=sumK(vMes,'efectivo'), ta=sumK(vMes,'tarjeta'), at=sumK(vMes,'athMovil');
+  $('repMetodos').innerHTML=`<div class="rep-soft-title">Cómo entró el dinero</div>${catBar('Efectivo',ef,totV)}${catBar('Tarjeta',ta,totV)}${catBar('ATH Móvil',at,totV)}`;
+  const dias=vMes.length, prom= dias>0?totV/dias:0;
+  let mejor=null; vMes.forEach(v=>{ if(!mejor||(Number(v.total)||0)>(Number(mejor.total)||0))mejor=v; });
+  let proyHtml='';
+  if(mk===monthKey(todayStr())){
+    const hoy=new Date(), diaActual=hoy.getDate(), diasMes=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate();
+    const proy= diaActual>0? totV/diaActual*diasMes : 0;
+    proyHtml=`<div class="rep-line"><span class="k">Proyección fin de mes</span><span class="v">${fmtShort(proy)}</span></div><div style="font-size:11px;opacity:0.4;font-style:italic;font-family:Fraunces;margin-top:6px">estimado si sigues a este ritmo</div>`;
+  }
+  $('repDiasInfo').innerHTML=`<div class="rep-soft-title">Ritmo de ventas</div>
+    <div class="rep-line"><span class="k">Días registrados</span><span class="v">${dias}</span></div>
+    <div class="rep-line"><span class="k">Promedio por día</span><span class="v">${fmt(prom)}</span></div>
+    <div class="rep-line"><span class="k">Mejor día</span><span class="v">${mejor?fmt(mejor.total)+' · '+esc(mejor.fecha):'—'}</span></div>
+    ${proyHtml}`;
+  const cats={}; gMes.forEach(g=>{ const c=g.categoria||'Otros'; cats[c]=(cats[c]||0)+(Number(g.monto)||0); });
+  const entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  $('repCatGastos').innerHTML=`<div class="rep-soft-title">En qué se fue el dinero</div>`+(entries.length?entries.map(([c,v])=>catBar(c,v,totG)).join(''):'<div class="empty-note">No hay gastos este mes.</div>');
+};
+function renderRepAnual(){
+  const year=todayStr().slice(0,4);
+  const inYear=s=>(s||'').slice(0,4)===year;
+  const vY=ventas.filter(v=>inYear(v.fecha)), gY=gastos.filter(g=>inYear(g.fecha));
+  const totV=sumK(vY,'total'), totG=sumK(gY,'monto'), neta=totV-totG;
+  $('repAnualChartTitle').textContent='Ventas vs gastos · '+year;
+  $('repAnualCards').innerHTML=`
+    <div class="stat-card"><div class="corner"></div><div class="label">Ventas ${year}</div><div class="value green">${fmtShort(totV)}</div><div class="sub">${vY.length} días</div></div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Gastos ${year}</div><div class="value">${fmtShort(totG)}</div><div class="sub">${gY.length} gastos</div></div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Ganancia neta</div><div class="value ${neta>=0?'green':'red'}">${fmtShort(neta)}</div><div class="sub">lo que va del año</div></div>
+    <div class="stat-card"><div class="corner"></div><div class="label">Margen promedio</div><div class="value">${totV>0?Math.round(neta/totV*100)+'%':'—'}</div><div class="sub">del año</div></div>`;
+  const curMonth=parseInt(todayStr().slice(5,7));
+  const data=[];
+  for(let m=1;m<=curMonth;m++){ const mk=year+'-'+String(m).padStart(2,'0'); data.push({m,v:sumK(ventas.filter(x=>monthKey(x.fecha)===mk),'total'),g:sumK(gastos.filter(x=>monthKey(x.fecha)===mk),'monto')}); }
+  const max=Math.max(1,...data.map(x=>Math.max(x.v,x.g)));
+  $('repAnualChart').innerHTML=data.map(x=>`<div class="cb-month"><div class="cb-pair"><div class="cb-bar ventas" style="height:${x.v/max*100}%" title="Ventas ${fmt(x.v)}"></div><div class="cb-bar gastos" style="height:${x.g/max*100}%" title="Gastos ${fmt(x.g)}"></div></div><div class="cb-label">${MESES[x.m-1]}</div></div>`).join('');
+  const withData=data.filter(x=>x.v>0||x.g>0).map(x=>({m:x.m,neta:x.v-x.g}));
+  let mejor=null,peor=null; withData.forEach(x=>{ if(!mejor||x.neta>mejor.neta)mejor=x; if(!peor||x.neta<peor.neta)peor=x; });
+  const promNeta= withData.length? withData.reduce((s,x)=>s+x.neta,0)/withData.length : 0;
+  $('repAnualMejorPeor').innerHTML=`<div class="rep-soft-title">Meses destacados</div>
+    <div class="rep-line"><span class="k">Mejor mes</span><span class="v">${mejor?MESES[mejor.m-1]+' · '+fmtShort(mejor.neta):'—'}</span></div>
+    <div class="rep-line"><span class="k">Mes más flojo</span><span class="v">${peor?MESES[peor.m-1]+' · '+fmtShort(peor.neta):'—'}</span></div>
+    <div class="rep-line"><span class="k">Ganancia promedio mensual</span><span class="v">${withData.length?fmtShort(promNeta):'—'}</span></div>`;
+  const cats={}; gY.forEach(g=>{ const c=g.categoria||'Otros'; cats[c]=(cats[c]||0)+(Number(g.monto)||0); });
+  const entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  $('repAnualCat').innerHTML=`<div class="rep-soft-title">Gastos por categoría · ${year}</div>`+(entries.length?entries.map(([c,v])=>catBar(c,v,totG)).join(''):'<div class="empty-note">Sin gastos este año.</div>');
+}
+function renderReportes(){ fillRepMes(); renderRepMensual(); renderRepAnual(); }
+window.exportRepMensual = () => {
+  const mk=$('repMes').value; if(!mk){ toast('Elige un mes',true); return; }
+  const vMes=ventas.filter(v=>monthKey(v.fecha)===mk), gMes=gastos.filter(g=>monthKey(g.fecha)===mk);
+  const totV=sumK(vMes,'total'), totG=sumK(gMes,'monto'), neta=totV-totG;
+  const resumen=[
+    {Concepto:'Ventas del mes',Monto:totV},{Concepto:'Gastos del mes',Monto:totG},{Concepto:'Ganancia neta',Monto:neta},
+    {Concepto:'Margen %',Monto: totV>0?Math.round(neta/totV*100):0},
+    {Concepto:'Efectivo',Monto:sumK(vMes,'efectivo')},{Concepto:'Tarjeta',Monto:sumK(vMes,'tarjeta')},{Concepto:'ATH Móvil',Monto:sumK(vMes,'athMovil')}
+  ];
+  const cats={}; gMes.forEach(g=>{ const c=g.categoria||'Otros'; cats[c]=(cats[c]||0)+(Number(g.monto)||0); });
+  const det=[...vMes.map(v=>({Fecha:v.fecha,Tipo:'Venta',Detalle:'Venta del día',Monto:Number(v.total)||0})),
+             ...gMes.map(g=>({Fecha:g.fecha,Tipo:'Gasto',Detalle:g.descripcion,Monto:-(Number(g.monto)||0)}))].sort((a,b)=>(a.Fecha||'').localeCompare(b.Fecha||''));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumen),'Resumen');
+  const catRows=Object.entries(cats).map(([c,v])=>({Categoria:c,Gasto:v}));
+  if(catRows.length) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(catRows),'Gastos por categoria');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(det),'Detalle');
+  XLSX.writeFile(wb,'savia-reporte-'+mk+'.xlsx');
+  toast('Reporte del mes descargado ✓');
+};
 
 /* ═══════════ MODAL / NAV UTILS ═══════════ */
 function openModal(){ $('modal').classList.add('show'); }
