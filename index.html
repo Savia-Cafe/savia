@@ -190,6 +190,11 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
 .icon-btn:hover{opacity:1;border-color:var(--savia);}
 .icon-btn.del:hover{border-color:var(--danger);color:var(--danger);}
 .thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;cursor:pointer;border:1px solid var(--linea);}
+.thumb-pdf{width:34px;height:34px;border-radius:7px;border:1px solid var(--linea);background:rgba(181,86,78,0.08);cursor:pointer;font-size:16px;display:inline-flex;align-items:center;justify-content:center;}
+.thumb-pdf:hover{border-color:var(--danger);}
+.pdf-chip{display:inline-flex;align-items:center;gap:10px;background:var(--humo);border:1px solid var(--linea-fuerte);border-radius:var(--radius-s);padding:11px 15px;font-size:13px;margin-top:12px;}
+.pdf-view{background:var(--savia);color:var(--crema);border:none;border-radius:8px;padding:6px 13px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.1em;text-transform:uppercase;}
+.pdf-view:hover{background:var(--savia-d);}
 
 /* ══════════ PRODUCTOS ══════════ */
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
@@ -429,9 +434,10 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
           <div class="sec-label">Recibo (opcional)</div>
           <div class="photo-drop" onclick="document.getElementById('gFoto').click()">
             <div class="ico">📷</div>
-            <div class="t">Toca para tomar o subir foto del recibo</div>
+            <div class="t">Toca para tomar foto o subir foto / PDF del recibo</div>
+            <div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">PDF máximo 700 KB</div>
           </div>
-          <input type="file" id="gFoto" accept="image/*" style="display:none" onchange="handleFotoSelect(event)">
+          <input type="file" id="gFoto" accept="image/*,application/pdf" style="display:none" onchange="handleFotoSelect(event)">
           <div id="gFotoPreview"></div>
         </div>
         <div class="card-section">
@@ -727,13 +733,45 @@ $('ventaForm').addEventListener('submit', async e => {
 /* ═══════════ GASTO ═══════════ */
 window.handleFotoSelect = async ev => {
   const file=ev.target.files[0]; if(!file) return;
-  showLoading('Procesando foto');
-  try{ currentFoto = await compressImage(file); showFotoPreview(currentFoto); }
-  catch(err){ toast('No se pudo procesar la foto',true); }
-  hideLoading();
+  if(file.type==='application/pdf'){
+    if(file.size > 700*1024){ toast('Ese PDF pesa más de 700 KB. Usa uno más liviano o tómale foto.',true); ev.target.value=''; return; }
+    showLoading('Procesando PDF');
+    try{ currentFoto = await fileToDataURL(file); showFotoPreview(currentFoto); }
+    catch(err){ toast('No se pudo procesar el PDF',true); }
+    hideLoading();
+  } else if(file.type.startsWith('image/')){
+    showLoading('Procesando foto');
+    try{ currentFoto = await compressImage(file); showFotoPreview(currentFoto); }
+    catch(err){ toast('No se pudo procesar la foto',true); }
+    hideLoading();
+  } else {
+    toast('Solo se permiten imágenes o PDF',true); ev.target.value='';
+  }
 };
+function isPdf(d){ return typeof d==='string' && d.startsWith('data:application/pdf'); }
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); }); }
+window.openCurrentFoto = () => openFile(currentFoto);
+window.openFile = (data) => {
+  if(!data) return;
+  if(isPdf(data)){
+    try{
+      const bytes=atob(data.split(',')[1]); const arr=new Uint8Array(bytes.length);
+      for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+      const blob=new Blob([arr],{type:'application/pdf'});
+      window.open(URL.createObjectURL(blob),'_blank');
+    }catch(e){ toast('No se pudo abrir el PDF',true); }
+  } else { openImg(data); }
+};
+window.getReceipt = (tipo,id) => { const arr=(tipo==='gasto')?gastos:ventas; const x=arr.find(e=>e.id===id); return x?x.foto:null; };
+window.openReceipt = (tipo,id) => openFile(getReceipt(tipo,id));
 function showFotoPreview(src){
-  $('gFotoPreview').innerHTML = src ? `<div class="photo-preview"><img src="${src}"><button type="button" class="photo-remove" onclick="removeFoto()">×</button></div>` : '';
+  const el=$('gFotoPreview');
+  if(!src){ el.innerHTML=''; return; }
+  if(isPdf(src)){
+    el.innerHTML = `<div class="photo-preview"><div class="pdf-chip">📄 PDF adjunto <button type="button" class="pdf-view" onclick="openCurrentFoto()">Ver</button></div><button type="button" class="photo-remove" onclick="removeFoto()">×</button></div>`;
+  } else {
+    el.innerHTML = `<div class="photo-preview"><img src="${src}"><button type="button" class="photo-remove" onclick="removeFoto()">×</button></div>`;
+  }
 }
 window.removeFoto = () => { currentFoto=null; $('gFoto').value=''; showFotoPreview(null); };
 function compressImage(file){
@@ -811,7 +849,7 @@ window.renderHistorial = () => {
       <td>${esc(r.desc)}</td>
       <td>${esc(r.cat)}</td>
       <td>${esc(r.met)}</td>
-      <td>${r.foto?`<img class="thumb" src="${r.foto}" onclick="openImg('${r.foto}')">`:''}</td>
+      <td>${r.foto ? (isPdf(r.foto) ? `<button class="thumb-pdf" onclick="openReceipt('${r._t}','${r.ref.id}')" title="Ver PDF">📄</button>` : `<img class="thumb" src="${r.foto}" onclick="openImg(this.src)" title="Ver">`) : ''}</td>
       <td style="text-align:right"><span class="money ${r.monto>=0?'pos':'neg'}">${r.monto>=0?'+':'−'}${fmt(Math.abs(r.monto))}</span></td>
       <td><div class="row-actions">
         <button class="icon-btn" onclick="editRow('${r._t}','${r.ref.id}')" title="Editar">✎</button>
@@ -871,7 +909,7 @@ function editGasto(id){
       <div class="form-group"><label>Método</label><select id="mMet">${['Efectivo','Tarjeta','Transferencia/ATH','Cheque'].map(m=>`<option ${m===g.metodo?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="form-group full"><label>Suplidor</label><input type="text" id="mSup" value="${esc(g.suplidor||'')}"></div>
     </div>
-    ${g.foto?`<div style="margin-top:14px"><img src="${g.foto}" style="max-width:140px;border-radius:10px;cursor:pointer" onclick="openImg('${g.foto}')"></div>`:''}`;
+    ${g.foto ? (isPdf(g.foto) ? `<div style="margin-top:14px"><button type="button" class="chip-btn" onclick="openReceipt('gasto','${g.id}')">📄 Ver PDF adjunto</button></div>` : `<div style="margin-top:14px"><img src="${g.foto}" style="max-width:140px;border-radius:10px;cursor:pointer" onclick="openImg(this.src)"></div>`) : ''}`;
   $('modalFoot').innerHTML=`<button class="submit-btn" onclick="saveGasto('${id}')">Guardar cambios</button><button class="submit-btn alt" onclick="closeModal()">Cancelar</button>`;
   openModal();
 }
