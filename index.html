@@ -732,23 +732,45 @@ $('ventaForm').addEventListener('submit', async e => {
 });
 
 /* ═══════════ GASTO ═══════════ */
-window.handleFotoSelect = async ev => {
-  const file=ev.target.files[0]; if(!file) return;
+let editFoto = null; // recibo en el modal de editar gasto
+// procesa una imagen (la comprime) o un PDF (valida tamaño). Devuelve el dataURL, o undefined si hubo error/rechazo.
+async function processReceiptFile(file){
   if(file.type==='application/pdf'){
-    if(file.size > 700*1024){ toast('Ese PDF pesa más de 700 KB. Usa uno más liviano o tómale foto.',true); ev.target.value=''; return; }
+    if(file.size > 700*1024){ toast('Ese PDF pesa más de 700 KB. Usa uno más liviano o tómale foto.',true); return undefined; }
     showLoading('Procesando PDF');
-    try{ currentFoto = await fileToDataURL(file); showFotoPreview(currentFoto); }
-    catch(err){ toast('No se pudo procesar el PDF',true); }
-    hideLoading();
+    try{ return await fileToDataURL(file); }
+    catch(err){ toast('No se pudo procesar el PDF',true); return undefined; }
+    finally{ hideLoading(); }
   } else if(file.type.startsWith('image/')){
     showLoading('Procesando foto');
-    try{ currentFoto = await compressImage(file); showFotoPreview(currentFoto); }
-    catch(err){ toast('No se pudo procesar la foto',true); }
-    hideLoading();
+    try{ return await compressImage(file); }
+    catch(err){ toast('No se pudo procesar la foto',true); return undefined; }
+    finally{ hideLoading(); }
   } else {
-    toast('Solo se permiten imágenes o PDF',true); ev.target.value='';
+    toast('Solo se permiten imágenes o PDF',true); return undefined;
   }
+}
+window.handleFotoSelect = async ev => {
+  const file=ev.target.files[0]; if(!file) return;
+  const r=await processReceiptFile(file);
+  if(r!==undefined){ currentFoto=r; showFotoPreview(currentFoto); } else { ev.target.value=''; }
 };
+window.handleEditFotoSelect = async ev => {
+  const file=ev.target.files[0]; if(!file) return;
+  const r=await processReceiptFile(file);
+  if(r!==undefined){ editFoto=r; showEditFotoPreview(); } else { ev.target.value=''; }
+};
+window.openEditFoto = () => openFile(editFoto);
+window.removeEditFoto = () => { editFoto=null; const i=$('mFoto'); if(i)i.value=''; showEditFotoPreview(); };
+function showEditFotoPreview(){
+  const el=$('mFotoPreview'); if(!el) return;
+  if(!editFoto){ el.innerHTML = `<div class="photo-drop" onclick="document.getElementById('mFoto').click()"><div class="ico">📷</div><div class="t">Toca para añadir foto / PDF del recibo</div><div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">PDF máximo 700 KB</div></div>`; return; }
+  if(isPdf(editFoto)){
+    el.innerHTML = `<div class="photo-preview"><div class="pdf-chip">📄 PDF adjunto <button type="button" class="pdf-view" onclick="openEditFoto()">Ver</button></div><button type="button" class="photo-remove" onclick="removeEditFoto()">×</button></div>`;
+  } else {
+    el.innerHTML = `<div class="photo-preview"><img src="${editFoto}"><button type="button" class="photo-remove" onclick="removeEditFoto()">×</button></div>`;
+  }
+}
 function isPdf(d){ return typeof d==='string' && d.startsWith('data:application/pdf'); }
 function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); }); }
 window.openCurrentFoto = () => openFile(currentFoto);
@@ -911,14 +933,16 @@ function editGasto(id){
       <div class="form-group"><label>Método</label><select id="mMet">${['Efectivo','Tarjeta','Transferencia/ATH','Cheque'].map(m=>`<option ${m===g.metodo?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="form-group full"><label>Suplidor</label><input type="text" id="mSup" value="${esc(g.suplidor||'')}"></div>
     </div>
-    ${g.foto ? (isPdf(g.foto) ? `<div style="margin-top:14px"><button type="button" class="chip-btn" onclick="openReceipt('gasto','${g.id}')">📄 Ver PDF adjunto</button></div>` : `<div style="margin-top:14px"><img src="${g.foto}" style="max-width:140px;border-radius:10px;cursor:pointer" onclick="openImg(this.src)"></div>`) : ''}`;
+    <div style="margin-top:16px"><label style="display:block;margin-bottom:8px">Recibo (foto o PDF)</label><div id="mFotoPreview"></div></div>
+    <input type="file" id="mFoto" accept="image/*,application/pdf" style="display:none" onchange="handleEditFotoSelect(event)">`;
   $('modalFoot').innerHTML=`<button class="submit-btn" onclick="saveGasto('${id}')">Guardar cambios</button><button class="submit-btn alt" onclick="closeModal()">Cancelar</button>`;
-  openModal();
+  editFoto = g.foto || null;
+  openModal(); showEditFotoPreview();
 }
 window.saveGasto = async id => {
   showLoading('Guardando');
   try{
-    const upd={descripcion:$('mDesc').value.trim(),monto:parseFloat($('mMonto').value)||0,fecha:$('mGFecha').value,categoria:$('mCat').value,metodo:$('mMet').value,suplidor:$('mSup').value.trim()};
+    const upd={descripcion:$('mDesc').value.trim(),monto:parseFloat($('mMonto').value)||0,fecha:$('mGFecha').value,categoria:$('mCat').value,metodo:$('mMet').value,suplidor:$('mSup').value.trim(),foto:editFoto};
     await updateDoc(doc(db,'gastos',id),upd);
     Object.assign(gastos.find(x=>x.id===id),upd);
     closeModal(); renderAll(); toast('Gasto actualizado ✓');
