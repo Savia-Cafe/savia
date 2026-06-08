@@ -458,7 +458,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
           <div class="photo-drop" onclick="document.getElementById('gFoto').click()">
             <div class="ico">📷</div>
             <div class="t">Toca para tomar foto o subir foto / PDF del recibo</div>
-            <div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">PDF máximo 700 KB</div>
+            <div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">Si el PDF pesa mucho, lo comprimo automáticamente</div>
           </div>
           <input type="file" id="gFoto" accept="image/*,application/pdf" style="display:none" onchange="handleFotoSelect(event)">
           <div id="gFotoPreview"></div>
@@ -800,12 +800,22 @@ $('ventaForm').addEventListener('submit', async e => {
 /* ═══════════ GASTO ═══════════ */
 let editFoto = null; // recibo en el modal de editar gasto
 // procesa una imagen (la comprime) o un PDF (valida tamaño). Devuelve el dataURL, o undefined si hubo error/rechazo.
+const RECEIPT_MAX = 700*1024;
 async function processReceiptFile(file){
   if(file.type==='application/pdf'){
-    if(file.size > 700*1024){ toast('Ese PDF pesa más de 700 KB. Usa uno más liviano o tómale foto.',true); return undefined; }
-    showLoading('Procesando PDF');
-    try{ return await fileToDataURL(file); }
-    catch(err){ toast('No se pudo procesar el PDF',true); return undefined; }
+    if(file.size <= RECEIPT_MAX){
+      showLoading('Procesando PDF');
+      try{ return await fileToDataURL(file); }
+      catch(err){ toast('No se pudo procesar el PDF',true); return undefined; }
+      finally{ hideLoading(); }
+    }
+    // pesa más de 700KB → intentar comprimir automáticamente
+    showLoading('Comprimiendo PDF…');
+    try{
+      const compressed = await compressPdf(file, RECEIPT_MAX);
+      if(compressed){ toast('PDF comprimido para que cupiera ✓'); return compressed; }
+      toast('El PDF sigue muy pesado aún comprimido. Usa uno más liviano o tómale foto.',true); return undefined;
+    }catch(err){ console.error(err); toast('No se pudo comprimir el PDF. Intenta tomarle foto.',true); return undefined; }
     finally{ hideLoading(); }
   } else if(file.type.startsWith('image/')){
     showLoading('Procesando foto');
@@ -830,7 +840,7 @@ window.openEditFoto = () => openFile(editFoto);
 window.removeEditFoto = () => { editFoto=null; const i=$('mFoto'); if(i)i.value=''; showEditFotoPreview(); };
 function showEditFotoPreview(){
   const el=$('mFotoPreview'); if(!el) return;
-  if(!editFoto){ el.innerHTML = `<div class="photo-drop" onclick="document.getElementById('mFoto').click()"><div class="ico">📷</div><div class="t">Toca para añadir foto / PDF del recibo</div><div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">PDF máximo 700 KB</div></div>`; return; }
+  if(!editFoto){ el.innerHTML = `<div class="photo-drop" onclick="document.getElementById('mFoto').click()"><div class="ico">📷</div><div class="t">Toca para añadir foto / PDF del recibo</div><div class="t" style="font-size:10px;opacity:0.4;margin-top:4px;">Si el PDF pesa mucho, lo comprimo automáticamente</div></div>`; return; }
   if(isPdf(editFoto)){
     el.innerHTML = `<div class="photo-preview"><div class="pdf-chip">📄 PDF adjunto <button type="button" class="pdf-view" onclick="openEditFoto()">Ver</button></div><button type="button" class="photo-remove" onclick="removeEditFoto()">×</button></div>`;
   } else {
@@ -839,6 +849,47 @@ function showEditFotoPreview(){
 }
 function isPdf(d){ return typeof d==='string' && d.startsWith('data:application/pdf'); }
 function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); }); }
+function blobToDataURL(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(blob); }); }
+let _pdfLibs=null;
+async function loadPdfLibs(){
+  if(_pdfLibs) return _pdfLibs;
+  _pdfLibs=(async()=>{
+    const pdfjs = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+    const jspdfMod = await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.es.min.js');
+    return { pdfjs, jsPDF: jspdfMod.jsPDF };
+  })();
+  return _pdfLibs;
+}
+// Rasteriza cada página del PDF a JPEG comprimido y reconstruye un PDF más liviano.
+// Prueba calidades decrecientes hasta caber bajo targetBytes. Devuelve dataURL o null.
+async function compressPdf(file, targetBytes){
+  const { pdfjs, jsPDF } = await loadPdfLibs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const attempts=[{scale:1.5,q:0.7},{scale:1.25,q:0.6},{scale:1.0,q:0.5},{scale:0.85,q:0.42}];
+  for(const {scale,q} of attempts){
+    let doc=null;
+    for(let p=1;p<=pdf.numPages;p++){
+      const page=await pdf.getPage(p);
+      const viewport=page.getViewport({scale});
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.floor(viewport.width));
+      canvas.height=Math.max(1,Math.floor(viewport.height));
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({ canvasContext:ctx, viewport }).promise;
+      const img=canvas.toDataURL('image/jpeg',q);
+      const pw=canvas.width, ph=canvas.height;
+      if(p===1) doc=new jsPDF({ unit:'pt', format:[pw,ph], compress:true });
+      else doc.addPage([pw,ph]);
+      doc.addImage(img,'JPEG',0,0,pw,ph);
+    }
+    const out=doc.output('arraybuffer');
+    if(out.byteLength<=targetBytes) return await blobToDataURL(new Blob([out],{type:'application/pdf'}));
+  }
+  return null;
+}
 window.openCurrentFoto = () => openFile(currentFoto);
 window.openFile = (data) => {
   if(!data) return;
