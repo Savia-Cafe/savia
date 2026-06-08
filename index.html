@@ -463,6 +463,7 @@ table.data tr:hover td{background:rgba(107,125,94,0.03);}
         <select id="hMes" onchange="renderHistorial()"><option value="">Todos los meses</option></select>
         <select id="hTipo" onchange="renderHistorial()"><option value="">Venta y gasto</option><option value="venta">Solo ventas</option><option value="gasto">Solo gastos</option></select>
         <select id="hCategoria" onchange="renderHistorial()"><option value="">Toda categoría</option></select>
+        <select id="hSuplidor" onchange="renderHistorial()"><option value="">Todo suplidor</option></select>
         <button class="chip-btn export" onclick="exportExcel()">⬇ Excel</button>
       </div>
       <div class="dash-grid" id="histSummary" style="margin-bottom:22px;">
@@ -822,18 +823,19 @@ $('gastoForm').addEventListener('submit', async e => {
 /* ═══════════ HISTORIAL ═══════════ */
 function unifiedRows(){
   const rows=[];
-  ventas.forEach(v=>rows.push({_t:'venta',fecha:v.fecha,desc:'Venta del día'+(v.notas?' — '+v.notas:''),cat:'Ventas',met:metodoVenta(v),foto:null,monto:Number(v.total)||0,ref:v}));
-  gastos.forEach(g=>rows.push({_t:'gasto',fecha:g.fecha,desc:g.descripcion,cat:g.categoria||'—',met:g.metodo||'—',foto:g.foto||null,monto:-(Number(g.monto)||0),ref:g}));
+  ventas.forEach(v=>rows.push({_t:'venta',fecha:v.fecha,desc:'Venta del día'+(v.notas?' — '+v.notas:''),cat:'Ventas',met:metodoVenta(v),sup:'',foto:null,monto:Number(v.total)||0,ref:v}));
+  gastos.forEach(g=>rows.push({_t:'gasto',fecha:g.fecha,desc:g.descripcion,cat:g.categoria||'—',met:g.metodo||'—',sup:g.suplidor||'',foto:g.foto||null,monto:-(Number(g.monto)||0),ref:g}));
   return rows.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
 }
 function metodoVenta(v){ const p=[]; if(v.efectivo)p.push('Efec'); if(v.tarjeta)p.push('Tarj'); if(v.athMovil)p.push('ATH'); return p.join('/')||'—'; }
 window.renderHistorial = () => {
-  const q=($('hSearch').value||'').toLowerCase(), fm=$('hMes').value, ft=$('hTipo').value, fc=$('hCategoria').value;
+  const q=($('hSearch').value||'').toLowerCase(), fm=$('hMes').value, ft=$('hTipo').value, fc=$('hCategoria').value, fs=$('hSuplidor').value;
   let rows=unifiedRows();
   if(fm) rows=rows.filter(r=>monthKey(r.fecha)===fm);
   if(ft) rows=rows.filter(r=>r._t===ft);
   if(fc) rows=rows.filter(r=>r.cat===fc);
-  if(q) rows=rows.filter(r=>(r.desc+' '+r.cat+' '+r.met).toLowerCase().includes(q));
+  if(fs) rows=rows.filter(r=>r.sup===fs);
+  if(q) rows=rows.filter(r=>(r.desc+' '+r.cat+' '+r.met+' '+r.sup).toLowerCase().includes(q));
   // resumen del periodo filtrado
   const sumV = rows.filter(r=>r._t==='venta').reduce((s,r)=>s+r.monto,0);
   const sumG = rows.filter(r=>r._t==='gasto').reduce((s,r)=>s+Math.abs(r.monto),0);
@@ -926,12 +928,13 @@ window.saveGasto = async id => {
 
 /* ═══════════ EXPORT EXCEL ═══════════ */
 window.exportExcel = () => {
-  const q=($('hSearch').value||'').toLowerCase(), fm=$('hMes').value, ft=$('hTipo').value, fc=$('hCategoria').value;
+  const q=($('hSearch').value||'').toLowerCase(), fm=$('hMes').value, ft=$('hTipo').value, fc=$('hCategoria').value, fs=$('hSuplidor').value;
   let rows=unifiedRows();
   if(fm) rows=rows.filter(r=>monthKey(r.fecha)===fm);
   if(ft) rows=rows.filter(r=>r._t===ft);
   if(fc) rows=rows.filter(r=>r.cat===fc);
-  if(q) rows=rows.filter(r=>(r.desc+' '+r.cat+' '+r.met).toLowerCase().includes(q));
+  if(fs) rows=rows.filter(r=>r.sup===fs);
+  if(q) rows=rows.filter(r=>(r.desc+' '+r.cat+' '+r.met+' '+r.sup).toLowerCase().includes(q));
   if(!rows.length){ toast('No hay nada que exportar',true); return; }
   const data = rows.map(r=>({Fecha:r.fecha,Tipo:r._t,Descripción:r.desc,Categoría:r.cat,Método:r.met,Monto:r.monto}));
   const ws=XLSX.utils.json_to_sheet(data); const wb=XLSX.utils.book_new();
@@ -1109,6 +1112,12 @@ function fillCategoriaSelects(){
 }
 function fillSuplidoresDatalist(){
   $('suplidoresList').innerHTML = suplidores.map(s=>`<option value="${esc(s.nombre)}">`).join('');
+  // selector de suplidor en el Historial (unión de la colección + los que aparecen en gastos)
+  const set=new Set(); suplidores.forEach(s=>{ if(s.nombre)set.add(s.nombre); }); gastos.forEach(g=>{ if(g.suplidor)set.add(g.suplidor); });
+  const nombres=[...set].sort((a,b)=>a.localeCompare(b));
+  const sel=$('hSuplidor'); const prev=sel.value;
+  sel.innerHTML = '<option value="">Todo suplidor</option>'+nombres.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if(nombres.includes(prev)) sel.value=prev;
 }
 function fillMesFilter(){
   const set=new Set(); ventas.forEach(v=>set.add(monthKey(v.fecha))); gastos.forEach(g=>set.add(monthKey(g.fecha)));
