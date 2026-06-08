@@ -671,6 +671,7 @@ onAuthStateChanged(auth, async user => {
     $('app').style.display='block';
     $('userLabel').textContent = user.email.split('@')[0];
     await loadAll();
+    restoreView();
   }else{
     $('authScreen').classList.remove('hidden');
     $('app').style.display='none';
@@ -706,9 +707,15 @@ $('nav').addEventListener('click', e => {
   btn.classList.add('active');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   $('view-'+btn.dataset.view).classList.add('active');
+  saveView(btn.dataset.view);
   closeMenu();
   window.scrollTo({top:0,behavior:'smooth'});
 });
+function saveView(v){ try{ localStorage.setItem('savia_view', v); }catch(e){} }
+function restoreView(){
+  let v=null; try{ v=localStorage.getItem('savia_view'); }catch(e){}
+  if(v && document.getElementById('view-'+v)) goView(v);
+}
 
 /* menú móvil */
 function closeMenu(){ $('nav').classList.remove('open'); $('menuToggle').classList.remove('open'); $('navBackdrop').classList.remove('show'); }
@@ -1382,7 +1389,7 @@ $('modal').addEventListener('click', e => { if(e.target.id==='modal') closeModal
 function goView(v){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
-  $('view-'+v).classList.add('active'); closeMenu(); window.scrollTo({top:0,behavior:'smooth'});
+  $('view-'+v).classList.add('active'); saveView(v); closeMenu(); window.scrollTo({top:0,behavior:'smooth'});
 }
 window.goView = goView;
 
